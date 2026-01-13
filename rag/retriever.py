@@ -1,8 +1,8 @@
 from sentence_transformers import SentenceTransformer, util
 import os
 
-model = SentenceTransformer("all-MiniLM-L6-v2")
 KB_PATH = "data/math_kb"
+model = SentenceTransformer("all-MiniLM-L6-v2")
 
 def build_vectorstore():
     docs = []
@@ -18,5 +18,4 @@ def retrieve_context(vectorstore, query, k=3):
     query_emb = model.encode(query, convert_to_tensor=True)
     scores = util.cos_sim(query_emb, vectorstore["embeddings"])[0]
     top_k = scores.topk(k).indices
-
     return [vectorstore["docs"][i] for i in top_k]
