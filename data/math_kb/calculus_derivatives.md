@@ -1,13 +1,11 @@
-## Power Rule
-If f(x) = xⁿ, then f′(x) = n·xⁿ⁻¹
+# Derivatives
 
-## Sum Rule
-d/dx (f(x) + g(x)) = f′(x) + g′(x)
+Derivative = rate of change.
 
-## Chain Rule
-If y = f(g(x)), then:
-dy/dx = f′(g(x)) · g′(x)
+Rules:
+- d/dx (xⁿ) = n·xⁿ⁻¹
+- d/dx (c) = 0
 
-## Common Mistakes
-- Forgetting to multiply by the power
-- Incorrect application of chain rule
+Example:
+d/dx (x²) = 2x
+
