@@ -69,20 +69,35 @@ if input_mode == "Text":
 # IMAGE INPUT (DISABLED FOR CLOUD)
 # =============================
 elif input_mode == "Image":
-    st.warning(
-        "📷 Image input is disabled in cloud deployment due to system-level OCR dependencies.\n\n"
-        "The code is implemented locally and documented in README."
-    )
+    from multimodal.ocr import extract_text_from_image
+
+    image = st.file_uploader("📷 Upload image", type=["jpg", "jpeg", "png"])
+    if image:
+        extracted_text, confidence = extract_text_from_image(image)
+
+        st.write(f"OCR Confidence: {confidence}")
+        if confidence < 0.75:
+            hitl_panel("Low OCR confidence")
+
+        user_text = st.text_area("Extracted text (editable)", extracted_text)
+
 
 
 # =============================
 # AUDIO INPUT (DISABLED FOR CLOUD)
 # =============================
 elif input_mode == "Audio":
-    st.warning(
-        "🎤 Audio input is disabled in cloud deployment due to Whisper limitations.\n\n"
-        "The code is implemented locally and documented in README."
-    )
+    from multimodal.asr import transcribe_audio
+
+    audio_bytes = st.audio_input("🎤 Record your math question")
+    if audio_bytes:
+        transcript, confidence = transcribe_audio(audio_bytes)
+
+        st.write(f"ASR Confidence: {confidence}")
+        if confidence < 0.75:
+            hitl_panel("Low ASR confidence")
+
+        user_text = st.text_area("Transcribed text (editable)", transcript)
 
 
 # =============================

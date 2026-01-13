@@ -1,23 +1,9 @@
-import easyocr
-import numpy as np
 from PIL import Image
-
-reader = easyocr.Reader(['en'], gpu=False)
+import pytesseract
 
 def extract_text_from_image(image_file):
-    image = Image.open(image_file).convert("RGB")
-    image_np = np.array(image)
+    image = Image.open(image_file)
+    text = pytesseract.image_to_string(image)
 
-    results = reader.readtext(image_np)
-
-    texts = []
-    confs = []
-
-    for _, text, conf in results:
-        texts.append(text)
-        confs.append(conf)
-
-    final_text = " ".join(texts)
-    confidence = sum(confs) / len(confs) if confs else 0.0
-
-    return final_text, round(confidence, 2)
+    confidence = 0.9 if text.strip() else 0.3
+    return text.strip(), confidence

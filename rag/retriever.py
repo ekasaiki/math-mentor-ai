@@ -1,5 +1,5 @@
-from sentence_transformers import SentenceTransformer, util
 import os
+from sentence_transformers import SentenceTransformer, util
 
 KB_PATH = "data/math_kb"
 model = SentenceTransformer("all-MiniLM-L6-v2")

@@ -1,37 +1,15 @@
-import whisper
 import tempfile
-import os
-import subprocess
-import shutil
+from faster_whisper import WhisperModel
 
-# 🔴 ABSOLUTE PATH TO FFMPEG.EXE (VERIFY THIS EXISTS)
-FFMPEG_EXE = r"C:\Users\saiki\Downloads\ffmpeg-8.0.1-essentials_build\ffmpeg-8.0.1-essentials_build\bin\ffmpeg.exe"
-
-# ✅ 1. Verify ffmpeg.exe exists
-if not os.path.exists(FFMPEG_EXE):
-    raise FileNotFoundError(f"ffmpeg.exe not found at: {FFMPEG_EXE}")
-
-# ✅ 2. Inject ffmpeg directory into PATH (CRITICAL)
-ffmpeg_dir = os.path.dirname(FFMPEG_EXE)
-os.environ["PATH"] = ffmpeg_dir + os.pathsep + os.environ.get("PATH", "")
-
-# ✅ 3. Force Whisper to see ffmpeg via shutil
-assert shutil.which("ffmpeg") is not None, "ffmpeg still not visible to Python"
-
-# Load Whisper model
-model = whisper.load_model("base")
+model = WhisperModel("small", device="cpu", compute_type="int8")
 
 def transcribe_audio(audio_bytes):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(audio_bytes.getvalue())
-        audio_path = tmp.name
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        f.write(audio_bytes.getvalue())
+        audio_path = f.name
 
-    result = model.transcribe(
-        audio_path,
-        fp16=False
-    )
+    segments, _ = model.transcribe(audio_path)
+    text = " ".join([seg.text for seg in segments])
 
-    text = result.get("text", "").strip()
-    confidence = 0.8 if text else 0.0
-
-    return text, confidence
+    confidence = 0.9 if text.strip() else 0.3
+    return text.strip(), confidence
