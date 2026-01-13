@@ -1,7 +1,7 @@
 import os
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.vectorstores import FAISS
-from langchain.embeddings import HuggingFaceEmbeddings
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 KB_PATH = "data/math_kb"
 
@@ -13,25 +13,21 @@ def load_documents():
                 docs.append(f.read())
     return docs
 
-
 def build_vectorstore():
-    raw_docs = load_documents()
+    docs = load_documents()
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    embeddings = model.encode(docs)
 
-    splitter = RecursiveCharacterTextSplitter(
-        chunk_size=400,
-        chunk_overlap=50
-    )
+    index = faiss.IndexFlatL2(embeddings.shape[1])
+    index.add(np.array(embeddings))
 
-    documents = splitter.create_documents(raw_docs)
-
-    # ✅ LOCAL EMBEDDINGS (NO API KEY)
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
-
-    vectorstore = FAISS.from_documents(documents, embeddings)
-    return vectorstore
-
+    return {
+        "index": index,
+        "docs": docs,
+        "model": model
+    }
 
 def retrieve_context(vectorstore, query, k=3):
-    return vectorstore.similarity_search(query, k=k)
+    q_emb = vectorstore["model"].encode([query])
+    _, I = vectorstore["index"].search(np.array(q_emb), k)
+    return [vectorstore["docs"][i] for i in I[0]]
