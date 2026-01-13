@@ -1,8 +1,5 @@
-streamlit==1.30.0
-numpy
-faiss-cpu
+streamlit
 sentence-transformers
-torch==2.0.1
-torchaudio==2.0.2
+numpy
 pillow
 pytesseract
