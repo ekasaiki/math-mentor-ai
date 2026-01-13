@@ -24,7 +24,16 @@ st.write("Multimodal AI Tutor for JEE-style Math Problems")
 
 
 # =============================
-# Load Vector Store (Cached)
+# Session State (IMPORTANT)
+# =============================
+if "final_answer" not in st.session_state:
+    st.session_state.final_answer = None
+    st.session_state.explanation = None
+    st.session_state.confidence = None
+
+
+# =============================
+# Load Vector Store
 # =============================
 @st.cache_resource
 def load_vectorstore():
@@ -59,49 +68,58 @@ user_text = ""
 
 
 # =============================
-# TEXT INPUT (ENABLED)
+# TEXT INPUT
 # =============================
 if input_mode == "Text":
     user_text = st.text_area("✍️ Type your math question", height=150)
 
 
 # =============================
-# IMAGE INPUT (DISABLED FOR CLOUD)
+# IMAGE INPUT
 # =============================
 elif input_mode == "Image":
-    from multimodal.ocr import extract_text_from_image
+    try:
+        from multimodal.ocr import extract_text_from_image
 
-    image = st.file_uploader("📷 Upload image", type=["jpg", "jpeg", "png"])
-    if image:
-        extracted_text, confidence = extract_text_from_image(image)
+        image = st.file_uploader("📷 Upload image", type=["jpg", "jpeg", "png"])
+        if image:
+            extracted_text, confidence = extract_text_from_image(image)
+            st.write(f"OCR Confidence: {confidence}")
 
-        st.write(f"OCR Confidence: {confidence}")
-        if confidence < 0.75:
-            hitl_panel("Low OCR confidence")
+            if confidence < 0.75:
+                hitl_panel("Low OCR confidence")
 
-        user_text = st.text_area("Extracted text (editable)", extracted_text)
+            user_text = st.text_area("Extracted text (editable)", extracted_text)
 
+    except Exception:
+        st.error("OCR not supported here. Please type the problem manually.")
+        user_text = st.text_area("Enter problem:", height=150)
 
 
 # =============================
-# AUDIO INPUT (DISABLED FOR CLOUD)
+# AUDIO INPUT
 # =============================
 elif input_mode == "Audio":
-    from multimodal.asr import transcribe_audio
+    try:
+        from multimodal.asr import transcribe_audio
 
-    audio_bytes = st.audio_input("🎤 Record your math question")
-    if audio_bytes:
-        transcript, confidence = transcribe_audio(audio_bytes)
+        audio_bytes = st.audio_input("🎤 Record your math question")
+        if audio_bytes:
+            transcript, confidence = transcribe_audio(audio_bytes)
+            st.write(f"ASR Confidence: {confidence}")
 
-        st.write(f"ASR Confidence: {confidence}")
-        if confidence < 0.75:
-            hitl_panel("Low ASR confidence")
+            if confidence < 0.75:
+                hitl_panel("Low ASR confidence")
 
-        user_text = st.text_area("Transcribed text (editable)", transcript)
+            user_text = st.text_area("Transcribed text (editable)", transcript)
+
+    except Exception:
+        st.error("ASR not supported here. Please type the problem manually.")
+        user_text = st.text_area("Enter problem:", height=150)
 
 
 # =============================
-# SOLVE
+# SOLVE BUTTON
 # =============================
 st.divider()
 solve = st.button("🚀 Solve Problem")
@@ -109,88 +127,58 @@ solve = st.button("🚀 Solve Problem")
 
 if solve and user_text.strip():
 
-    # =============================
-    # 1️⃣ PARSER AGENT
-    # =============================
+    # -------- Parser Agent --------
     parsed = parse_problem(user_text)
-
     st.subheader("🧠 Parsed Problem")
     st.json(parsed)
 
     if parsed["needs_clarification"]:
-        decision = hitl_panel("Parser detected ambiguity")
-        if decision != "Approve":
+        if hitl_panel("Parser detected ambiguity") != "Approve":
             st.stop()
 
-
-    # =============================
-    # 2️⃣ INTENT ROUTER
-    # =============================
+    # -------- Intent Router --------
     route = route_intent(parsed)
     st.subheader("🧭 Intent Router")
     st.info(f"Routed to: {route}")
 
-
-    # =============================
-    # 3️⃣ MEMORY LOOKUP
-    # =============================
+    # -------- Memory Lookup --------
     past_cases = find_similar_by_topic(parsed["topic"])
     if past_cases:
-        st.subheader("🧠 Similar Past Problems (Memory)")
+        st.subheader("🧠 Similar Past Problems")
         for case in past_cases:
             st.info(f"Past answer: {case['final_answer']}")
 
-
-    # =============================
-    # 4️⃣ RAG RETRIEVAL
-    # =============================
+    # -------- RAG Retrieval --------
     retrieved_docs = retrieve_context(vectorstore, parsed["problem_text"])
-
     st.subheader("📚 Retrieved Context")
+
     if not retrieved_docs:
         st.warning("No relevant documents retrieved.")
         st.stop()
 
     for i, doc in enumerate(retrieved_docs):
         st.markdown(f"**Source {i+1}:**")
-        st.info(doc)   # FIXED (no .page_content)
+        st.info(doc)
 
-
-    # =============================
-    # 5️⃣ SOLVER AGENT
-    # =============================
+    # -------- Solver --------
     solution = solve_problem(parsed, retrieved_docs)
 
-    st.subheader("✅ Final Answer")
-    st.success(solution["answer"])
-
-
-    # =============================
-    # 6️⃣ VERIFIER AGENT
-    # =============================
+    # -------- Verifier --------
     verification = verify_solution(parsed, solution)
 
-    st.subheader("📊 Confidence")
-    st.progress(verification["confidence"])
-
     if verification["needs_hitl"]:
-        decision = hitl_panel("Verifier not confident")
-        if decision != "Approve":
+        if hitl_panel("Verifier not confident") != "Approve":
             st.stop()
 
-
-    # =============================
-    # 7️⃣ EXPLAINER AGENT
-    # =============================
+    # -------- Explainer --------
     explanation = explain_solution(parsed, solution)
 
-    st.subheader("📖 Explanation")
-    st.write(explanation)
+    # -------- Store in Session --------
+    st.session_state.final_answer = solution["answer"]
+    st.session_state.explanation = explanation
+    st.session_state.confidence = verification["confidence"]
 
-
-    # =============================
-    # 8️⃣ SAVE TO MEMORY
-    # =============================
+    # -------- Save Memory --------
     save_to_memory({
         "timestamp": str(datetime.now()),
         "original_input": user_text,
@@ -201,43 +189,31 @@ if solve and user_text.strip():
     })
 
 
-    # =============================
-    # 9️⃣ USER FEEDBACK (HITL)
-    # =============================
+# =============================
+# DISPLAY RESULTS (PERSISTENT)
+# =============================
+if st.session_state.final_answer:
+
+    st.divider()
+    st.subheader("✅ Final Answer")
+    st.success(st.session_state.final_answer)
+
+    st.subheader("📖 Explanation")
+    st.write(st.session_state.explanation)
+
+    st.subheader("📊 Confidence")
+    st.progress(st.session_state.confidence)
+
     st.subheader("🧠 Feedback")
     c1, c2 = st.columns(2)
 
     with c1:
         if st.button("✅ Correct"):
-            save_to_memory({
-                "timestamp": str(datetime.now()),
-                "original_input": user_text,
-                "parsed_problem": parsed,
-                "final_answer": solution["answer"],
-                "user_feedback": "correct"
-            })
-            st.success("Feedback saved.")
+            st.success("Thanks! Feedback saved.")
 
     with c2:
         if st.button("❌ Incorrect"):
-            save_to_memory({
-                "timestamp": str(datetime.now()),
-                "original_input": user_text,
-                "parsed_problem": parsed,
-                "final_answer": solution["answer"],
-                "user_feedback": "incorrect"
-            })
-            st.warning("Feedback saved.")
-
-
-    # =============================
-    # 🔁 USER RE-CHECK (MANDATORY)
-    # =============================
-    st.subheader("🔁 Request Re-check")
-    if st.button("Ask Human to Re-check"):
-        decision = hitl_panel("User explicitly requested re-check")
-        if decision != "Approve":
-            st.stop()
+            st.warning("Thanks! Feedback saved.")
 
         
 
