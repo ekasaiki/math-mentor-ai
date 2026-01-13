@@ -26,7 +26,6 @@ The system solves **JEE-style math problems** using **RAG + Multi-Agent System +
 ---
 
 ## 🏗️ Architecture
-```mermaid
 flowchart TD
     A[User Input: Text / Image / Audio] --> B[OCR / ASR]
     B --> C[Parser Agent]
