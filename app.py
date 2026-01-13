@@ -11,7 +11,6 @@ from agents.explainer_agent import explain_solution
 # -------- RAG --------
 from rag.retriever import build_vectorstore, retrieve_context
 
-
 # -------- Memory --------
 from memory.memory_store import save_to_memory, find_similar_by_topic
 
@@ -22,6 +21,7 @@ from memory.memory_store import save_to_memory, find_similar_by_topic
 st.set_page_config(page_title="Math Mentor AI", layout="wide")
 st.title("🧠 Math Mentor AI")
 st.write("Multimodal AI Tutor for JEE-style Math Problems")
+
 
 # =============================
 # Load Vector Store (Cached)
@@ -34,7 +34,7 @@ vectorstore = load_vectorstore()
 
 
 # =============================
-# HITL PANEL (FIXED)
+# HITL PANEL
 # =============================
 def hitl_panel(reason: str):
     st.warning(f"🧑‍⚖️ HITL Triggered: {reason}")
@@ -59,50 +59,30 @@ user_text = ""
 
 
 # =============================
-# TEXT INPUT
+# TEXT INPUT (ENABLED)
 # =============================
 if input_mode == "Text":
     user_text = st.text_area("✍️ Type your math question", height=150)
 
 
 # =============================
-# IMAGE INPUT (OCR)
+# IMAGE INPUT (DISABLED FOR CLOUD)
 # =============================
 elif input_mode == "Image":
-    from multimodal.ocr import extract_text_from_image
-
-    image = st.file_uploader("📷 Upload image", type=["jpg", "jpeg", "png"])
-
-    if image:
-        extracted_text, confidence = extract_text_from_image(image)
-
-        st.write(f"OCR Confidence: {confidence}")
-        if confidence < 0.75:
-            decision = hitl_panel("Low OCR confidence")
-            if decision == "Edit and Re-run":
-                extracted_text = st.text_area("Edit OCR text:", extracted_text)
-
-        user_text = st.text_area("Extracted text (editable)", extracted_text)
+    st.warning(
+        "📷 Image input is disabled in cloud deployment due to system-level OCR dependencies.\n\n"
+        "The code is implemented locally and documented in README."
+    )
 
 
 # =============================
-# AUDIO INPUT (ASR)
+# AUDIO INPUT (DISABLED FOR CLOUD)
 # =============================
 elif input_mode == "Audio":
-    from multimodal.asr import transcribe_audio
-
-    audio_bytes = st.audio_input("🎤 Record your math question")
-
-    if audio_bytes:
-        transcript, confidence = transcribe_audio(audio_bytes)
-
-        st.write(f"ASR Confidence: {confidence}")
-        if confidence < 0.75:
-            decision = hitl_panel("Low ASR confidence")
-            if decision == "Edit and Re-run":
-                transcript = st.text_area("Edit transcript:", transcript)
-
-        user_text = st.text_area("Transcribed text (editable)", transcript)
+    st.warning(
+        "🎤 Audio input is disabled in cloud deployment due to Whisper limitations.\n\n"
+        "The code is implemented locally and documented in README."
+    )
 
 
 # =============================
@@ -127,6 +107,7 @@ if solve and user_text.strip():
         if decision != "Approve":
             st.stop()
 
+
     # =============================
     # 2️⃣ INTENT ROUTER
     # =============================
@@ -134,14 +115,16 @@ if solve and user_text.strip():
     st.subheader("🧭 Intent Router")
     st.info(f"Routed to: {route}")
 
+
     # =============================
-    # 3️⃣ MEMORY LOOKUP (SELF-LEARNING)
+    # 3️⃣ MEMORY LOOKUP
     # =============================
     past_cases = find_similar_by_topic(parsed["topic"])
     if past_cases:
         st.subheader("🧠 Similar Past Problems (Memory)")
         for case in past_cases:
             st.info(f"Past answer: {case['final_answer']}")
+
 
     # =============================
     # 4️⃣ RAG RETRIEVAL
@@ -155,7 +138,8 @@ if solve and user_text.strip():
 
     for i, doc in enumerate(retrieved_docs):
         st.markdown(f"**Source {i+1}:**")
-        st.info(doc.page_content)
+        st.info(doc)   # FIXED (no .page_content)
+
 
     # =============================
     # 5️⃣ SOLVER AGENT
@@ -164,6 +148,7 @@ if solve and user_text.strip():
 
     st.subheader("✅ Final Answer")
     st.success(solution["answer"])
+
 
     # =============================
     # 6️⃣ VERIFIER AGENT
@@ -178,6 +163,7 @@ if solve and user_text.strip():
         if decision != "Approve":
             st.stop()
 
+
     # =============================
     # 7️⃣ EXPLAINER AGENT
     # =============================
@@ -186,6 +172,7 @@ if solve and user_text.strip():
     st.subheader("📖 Explanation")
     st.write(explanation)
 
+
     # =============================
     # 8️⃣ SAVE TO MEMORY
     # =============================
@@ -193,10 +180,11 @@ if solve and user_text.strip():
         "timestamp": str(datetime.now()),
         "original_input": user_text,
         "parsed_problem": parsed,
-        "retrieved_context": [d.page_content for d in retrieved_docs],
+        "retrieved_context": retrieved_docs,
         "final_answer": solution["answer"],
         "verifier": verification
     })
+
 
     # =============================
     # 9️⃣ USER FEEDBACK (HITL)
@@ -226,6 +214,7 @@ if solve and user_text.strip():
             })
             st.warning("Feedback saved.")
 
+
     # =============================
     # 🔁 USER RE-CHECK (MANDATORY)
     # =============================
@@ -234,9 +223,6 @@ if solve and user_text.strip():
         decision = hitl_panel("User explicitly requested re-check")
         if decision != "Approve":
             st.stop()
-
-    
-    
 
         
 
