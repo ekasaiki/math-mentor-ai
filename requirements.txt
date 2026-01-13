@@ -1,0 +1,19 @@
+streamlit>=1.31.0
+
+# OCR
+pytesseract
+Pillow
+opencv-python
+
+# Audio / ASR
+openai-whisper
+ffmpeg-python
+
+# RAG + embeddings (LOCAL)
+sentence-transformers
+faiss-cpu
+
+# Utilities
+numpy
+scikit-learn
+python-dotenv
