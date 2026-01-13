@@ -1,33 +1,31 @@
-# 🧠 Math Mentor AI
-Reliable Multimodal Math Tutor (RAG + Agents + HITL + Memory)
+# Multimodal Math Mentor AI
 
-## 🚀 Overview
-Math Mentor AI is a reliable AI tutor that solves JEE-style math problems using:
-- Multimodal input (Text / Image / Audio)
+An end-to-end AI system that solves JEE-style math problems using
+RAG, multi-agent reasoning, Human-in-the-Loop (HITL), and memory-based learning.
+
+---
+
+## 🚀 Features
+- Text, Image (OCR), and Audio (ASR) input
+- Parser → Router → Solver → Verifier → Explainer agents
 - Retrieval-Augmented Generation (RAG)
-- Multi-agent architecture
-- Human-in-the-loop (HITL)
-- Memory-based self-learning (no retraining)
+- Human-in-the-Loop review
+- Memory-based self learning
+- Streamlit UI
 
-## ✨ Features
-- 📷 OCR for handwritten / textbook problems
-- 🎤 Audio input using ASR
-- 🧠 Parser → Router → Solver → Verifier → Explainer agents
-- 📚 Curated math knowledge base
-- 👨‍🏫 Human review when confidence is low
-- 🧠 Memory reuse for similar problems
+---
 
-## 🧩 Architecture
+## 🧠 Architecture
 ```mermaid
 flowchart TD
-    A[Input: Text/Image/Audio] --> B[OCR / ASR]
-    B --> C[Parser Agent]
-    C -->|Ambiguous| H[HITL]
-    C --> D[Intent Router]
-    D --> E[RAG Retriever]
-    E --> F[Solver Agent]
-    F --> G[Verifier Agent]
-    G -->|Low Confidence| H
-    G --> I[Explainer Agent]
-    I --> J[Final Answer]
-    J --> K[Memory Store]
+    Input --> OCR_ASR
+    OCR_ASR --> Parser
+    Parser --> Router
+    Router --> RAG
+    RAG --> Solver
+    Solver --> Verifier
+    Verifier --> Explainer
+    Explainer --> UI
+    Verifier -->|Low confidence| HITL
+    HITL --> Memory
+    Solver --> Memory
