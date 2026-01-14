@@ -1,51 +1,88 @@
+
 import re
 
-def solve_problem(parsed_problem, retrieved_docs):
-    problem_text = parsed_problem["problem_text"].lower()
-    topic = parsed_problem["topic"]
+def extract_numbers(text):
+    return list(map(int, re.findall(r"-?\d+", text)))
 
-    # -------- ALGEBRA --------
-    if topic == "algebra":
-        eq = re.search(r"([a-z])\s*\+\s*([a-z])\s*=\s*(\d+)", problem_text)
-        val = re.search(r"where\s*([a-z])\s*=\s*(\d+)", problem_text)
-        target = re.search(r"then\s*([a-z])\s*=\s*\?", problem_text)
+def solve_problem(parsed, retrieved_docs):
+    topic = parsed["topic"].lower()
+    question = parsed["problem_text"].lower()
+    docs = " ".join(retrieved_docs).lower()
 
-        if eq and val and target:
-            v1, v2, total = eq.groups()
-            known_var, known_val = val.groups()
-            target_var = target.group(1)
+    # ==========================
+    # PROBABILITY (Dice, Coin, Cards)
+    # ==========================
+    if topic == "probability" and "probability =" in docs:
 
-            total = int(total)
-            known_val = int(known_val)
+        total = None
+        if "dice" in question and "dice = 6" in docs:
+            total = 6
+        elif "coin" in question and "coin = 2" in docs:
+            total = 2
+        elif "card" in question and "cards = 52" in docs:
+            total = 52
 
+        if total:
+            favorable = 1
             return {
-                "answer": f"{target_var} = {total - known_val}",
-                "method": "Linear substitution"
+                "answer": f"{favorable}/{total}",
+                "steps": [
+                    f"Total outcomes = {total}",
+                    f"Favorable outcomes = {favorable}",
+                    f"Probability = {favorable}/{total}"
+                ]
             }
 
-    # -------- PROBABILITY --------
-    if topic == "probability":
-        if "coin" in problem_text and "head" in problem_text:
-            return {"answer": "1/2", "method": "Classical probability"}
-        if "dice" in problem_text and "even" in problem_text:
-            return {"answer": "1/2", "method": "Favorable outcomes / total"}
+    # ==========================
+    # ALGEBRA (Linear equations)
+    # ==========================
+    if topic == "algebra" and "b = c - a" in docs:
+        nums = extract_numbers(question)
+        if len(nums) >= 2:
+            c, a = nums[0], nums[1]
+            b = c - a
+            return {
+                "answer": f"b = {b}",
+                "steps": [
+                    f"Given a + b = {c}",
+                    f"Given a = {a}",
+                    f"b = {c} - {a} = {b}"
+                ]
+            }
 
-    # -------- CALCULUS --------
-    if topic == "calculus":
-        if "x^2" in problem_text or "x²" in problem_text:
-            return {"answer": "2x", "method": "Power rule"}
-
-    # -------- LINEAR ALGEBRA --------
-    if topic == "linear algebra":
-        nums = list(map(int, re.findall(r"-?\d+", problem_text)))
-        if "determinant" in problem_text and len(nums) == 4:
+    # ==========================
+    # LINEAR ALGEBRA (Determinant)
+    # ==========================
+    if topic == "linear algebra" and "determinant = ad - bc" in docs:
+        nums = extract_numbers(question)
+        if len(nums) == 4:
             a, b, c, d = nums
+            det = a*d - b*c
             return {
-                "answer": str(a*d - b*c),
-                "method": "2×2 determinant"
+                "answer": str(det),
+                "steps": [
+                    f"Matrix = [[{a},{b}],[{c},{d}]]",
+                    f"Determinant = ({a}×{d}) − ({b}×{c}) = {det}"
+                ]
             }
 
+    # ==========================
+    # CALCULUS (Derivatives)
+    # ==========================
+    if topic == "calculus" and "d/dx" in docs:
+        if "x^2" in question:
+            return {
+                "answer": "2x",
+                "steps": [
+                    "Using power rule",
+                    "d/dx (x²) = 2x"
+                ]
+            }
+
+    # ==========================
+    # FALLBACK (HITL)
+    # ==========================
     return {
-        "answer": "Unable to solve with current rules.",
-        "method": "Unsupported pattern"
+        "answer": "Unable to solve with available knowledge.",
+        "steps": ["No matching formula found in retrieved documents."]
     }
