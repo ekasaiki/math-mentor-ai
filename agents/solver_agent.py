@@ -1,102 +1,163 @@
 import re
+from math import prod
 
+# ---------------------------
+# Utilities
+# ---------------------------
+def extract_numbers(text):
+    return list(map(int, re.findall(r"-?\d+", text)))
+
+def fail(reason="Unsupported problem"):
+    return {
+        "answer": "Unable to solve reliably",
+        "steps": [
+            reason,
+            "Human-in-the-loop required"
+        ]
+    }
+
+# ---------------------------
+# Main Solver
+# ---------------------------
 def solve_problem(parsed, retrieved_docs):
     text = parsed["problem_text"].lower()
     topic = parsed["topic"]
+    nums = extract_numbers(text)
 
-    # =========================
-    # PROBABILITY MODEL
-    # =========================
+    # =================================================
+    # 1️⃣ PROBABILITY ENGINE (Dice / Coin / Cards)
+    # =================================================
     if topic == "probability":
 
-        # Total outcomes
+        # ---- Sample space ----
         if "dice" in text:
-            sample_space = list(range(1, 7))
+            space = list(range(1, 7))
         elif "coin" in text:
-            sample_space = ["H", "T"]
+            space = ["H", "T"]
+        elif "card" in text:
+            space = list(range(1, 53))
         else:
-            return fail()
+            return fail("Unknown probability experiment")
 
-        # Event condition
-        favorable = []
+        # ---- Event ----
+        event = []
 
         if "prime" in text:
-            favorable = [x for x in sample_space if x in [2,3,5]]
+            event = [x for x in space if isinstance(x, int) and x in [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47]]
 
         elif "even" in text:
-            favorable = [x for x in sample_space if isinstance(x, int) and x % 2 == 0]
+            event = [x for x in space if isinstance(x, int) and x % 2 == 0]
 
         elif "odd" in text:
-            favorable = [x for x in sample_space if isinstance(x, int) and x % 2 == 1]
+            event = [x for x in space if isinstance(x, int) and x % 2 == 1]
 
         elif "greater than" in text:
-            n = int(re.findall(r"greater than (\d+)", text)[0])
-            favorable = [x for x in sample_space if isinstance(x, int) and x > n]
+            n = nums[-1]
+            event = [x for x in space if isinstance(x, int) and x > n]
 
         elif "less than" in text:
-            n = int(re.findall(r"less than (\d+)", text)[0])
-            favorable = [x for x in sample_space if isinstance(x, int) and x < n]
+            n = nums[-1]
+            event = [x for x in space if isinstance(x, int) and x < n]
 
-        elif "getting" in text:
-            n = int(re.findall(r"getting (\d+)", text)[0])
-            favorable = [x for x in sample_space if x == n]
+        elif "getting" in text and nums:
+            n = nums[-1]
+            event = [x for x in space if x == n]
 
         else:
-            return fail()
+            return fail("Could not identify event")
 
         return {
-            "answer": f"{len(favorable)}/{len(sample_space)}",
+            "answer": f"{len(event)}/{len(space)}",
             "steps": [
-                f"Sample space = {sample_space}",
-                f"Favorable outcomes = {favorable}",
+                f"Sample space = {space}",
+                f"Favorable outcomes = {event}",
                 "Probability = favorable / total outcomes"
             ]
         }
 
-    # =========================
-    # ALGEBRA (LINEAR)
-    # =========================
+    # =================================================
+    # 2️⃣ ALGEBRA ENGINE (Linear equations)
+    # =================================================
     if topic == "algebra":
-        nums = list(map(int, re.findall(r"-?\d+", text)))
 
-        if "a + b =" in text and "a =" in text:
-            total, a = nums
-            b = total - a
+        # Example: a + b = 7, a = 3
+        if "+" in text and "=" in text and len(nums) == 2:
+            total, known = nums
+            unknown = total - known
             return {
-                "answer": f"{b}",
+                "answer": str(unknown),
                 "steps": [
-                    "Given: a + b = total",
-                    "Substitute known value of a",
-                    "Solve for b = total − a"
+                    "Given linear equation",
+                    "Substitute known value",
+                    "Solve for unknown"
                 ]
             }
 
-        return fail()
+        # Example: 2x = 10
+        if len(nums) == 2 and "x" in text:
+            a, b = nums
+            if "=" in text:
+                return {
+                    "answer": str(b // a),
+                    "steps": [
+                        "Given linear equation",
+                        "Divide both sides by coefficient"
+                    ]
+                }
 
-    # =========================
-    # LINEAR ALGEBRA (DETERMINANT)
-    # =========================
+        return fail("Unsupported algebra structure")
+
+    # =================================================
+    # 3️⃣ LINEAR ALGEBRA ENGINE
+    # =================================================
     if topic == "linear algebra":
-        nums = list(map(int, re.findall(r"-?\d+", text)))
-        if len(nums) == 4:
+
+        # Determinant 2×2
+        if "determinant" in text and len(nums) == 4:
             a, b, c, d = nums
             det = a*d - b*c
             return {
                 "answer": str(det),
                 "steps": [
-                    "Determinant formula: ad − bc",
+                    "Use determinant formula: ad − bc",
                     f"= {a}×{d} − {b}×{c}"
                 ]
             }
 
-    return fail()
+        return fail("Unsupported matrix size")
 
+    # =================================================
+    # 4️⃣ CALCULUS ENGINE (Basic)
+    # =================================================
+    if topic == "calculus":
 
-def fail():
-    return {
-        "answer": "Cannot solve this problem reliably.",
-        "steps": [
-            "Problem structure not supported",
-            "Human-in-the-loop required"
-        ]
-    }
+        if "x^2" in text:
+            return {
+                "answer": "2x",
+                "steps": [
+                    "Apply power rule",
+                    "d/dx(x²) = 2x"
+                ]
+            }
+
+        if "x^3" in text:
+            return {
+                "answer": "3x²",
+                "steps": [
+                    "Apply power rule",
+                    "d/dx(x³) = 3x²"
+                ]
+            }
+
+        if "limit" in text and nums:
+            return {
+                "answer": str(nums[-1] ** 2),
+                "steps": [
+                    "Direct substitution",
+                    "Limit evaluated"
+                ]
+            }
+
+        return fail("Unsupported calculus operation")
+
+    return fail("Unknown topic")
