@@ -1,4 +1,3 @@
-
 import re
 
 def extract_numbers(text):
@@ -7,39 +6,42 @@ def extract_numbers(text):
 def solve_problem(parsed, retrieved_docs):
     topic = parsed["topic"].lower()
     question = parsed["problem_text"].lower()
-    docs = " ".join(retrieved_docs).lower()
+    docs_text = " ".join(retrieved_docs).lower()
 
     # ==========================
-    # PROBABILITY (Dice, Coin, Cards)
+    # PROBABILITY
     # ==========================
-    if topic == "probability" and "probability =" in docs:
+    if topic == "probability":
 
-        total = None
-        if "dice" in question and "dice = 6" in docs:
+        # Detect entity
+        if "dice" in question:
             total = 6
-        elif "coin" in question and "coin = 2" in docs:
+        elif "coin" in question:
             total = 2
-        elif "card" in question and "cards = 52" in docs:
+        elif "card" in question:
             total = 52
+        else:
+            total = None
 
         if total:
             favorable = 1
             return {
                 "answer": f"{favorable}/{total}",
                 "steps": [
-                    f"Total outcomes = {total}",
+                    f"Total possible outcomes = {total}",
                     f"Favorable outcomes = {favorable}",
                     f"Probability = {favorable}/{total}"
                 ]
             }
 
     # ==========================
-    # ALGEBRA (Linear equations)
+    # ALGEBRA (Linear)
     # ==========================
-    if topic == "algebra" and "b = c - a" in docs:
+    if topic == "algebra":
         nums = extract_numbers(question)
-        if len(nums) >= 2:
-            c, a = nums[0], nums[1]
+        if len(nums) >= 2 and "+" in question:
+            c = nums[0]
+            a = nums[1]
             b = c - a
             return {
                 "answer": f"b = {b}",
@@ -51,13 +53,13 @@ def solve_problem(parsed, retrieved_docs):
             }
 
     # ==========================
-    # LINEAR ALGEBRA (Determinant)
+    # LINEAR ALGEBRA (2x2 determinant)
     # ==========================
-    if topic == "linear algebra" and "determinant = ad - bc" in docs:
+    if topic == "linear algebra" and "determinant" in question:
         nums = extract_numbers(question)
         if len(nums) == 4:
             a, b, c, d = nums
-            det = a*d - b*c
+            det = a * d - b * c
             return {
                 "answer": str(det),
                 "steps": [
@@ -67,22 +69,22 @@ def solve_problem(parsed, retrieved_docs):
             }
 
     # ==========================
-    # CALCULUS (Derivatives)
+    # CALCULUS (basic derivative)
     # ==========================
-    if topic == "calculus" and "d/dx" in docs:
-        if "x^2" in question:
+    if topic == "calculus":
+        if "x^2" in question or "x²" in question:
             return {
                 "answer": "2x",
                 "steps": [
                     "Using power rule",
-                    "d/dx (x²) = 2x"
+                    "d/dx(x²) = 2x"
                 ]
             }
 
     # ==========================
-    # FALLBACK (HITL)
+    # FALLBACK
     # ==========================
     return {
         "answer": "Unable to solve with available knowledge.",
-        "steps": ["No matching formula found in retrieved documents."]
+        "steps": ["No applicable formula detected."]
     }
