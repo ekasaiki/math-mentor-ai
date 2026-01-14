@@ -1,48 +1,25 @@
-def parse_problem(text: str):
-    text = text.lower().strip()
+import re
 
-    topic = "algebra"
-    needs_clarification = False
-    variables = []
-    constraints = []
+def parse_problem(text):
+    text = text.strip()
 
-    # -------- TOPIC DETECTION --------
-    if any(word in text for word in ["probability", "coin", "dice"]):
+    topic = "unknown"
+    if "dice" in text or "coin" in text or "probability" in text:
         topic = "probability"
-
-    elif any(word in text for word in ["derivative", "limit", "dx", "x^"]):
-        topic = "calculus"
-
-    elif any(word in text for word in ["determinant", "matrix"]):
+    elif "determinant" in text:
         topic = "linear algebra"
-
-    else:
+    elif "find derivative" in text or "differentiate" in text:
+        topic = "calculus"
+    elif "=" in text:
         topic = "algebra"
 
-    # -------- VARIABLE EXTRACTION (ONLY WHEN NEEDED) --------
-    if topic in ["algebra", "calculus"]:
-        for ch in text:
-            if ch.isalpha() and ch not in variables:
-                variables.append(ch)
+    numbers = list(map(int, re.findall(r"-?\d+", text)))
 
-    # -------- AMBIGUITY RULES --------
-    if topic == "algebra":
-        if "=" not in text:
-            needs_clarification = True
-
-    if topic == "calculus":
-        if "x" not in text:
-            needs_clarification = True
-
-    # ❗ IMPORTANT: probability & linear algebra do NOT need variables
-    if topic in ["probability", "linear algebra"]:
-        needs_clarification = False
-        variables = []
+    needs_clarification = len(numbers) == 0
 
     return {
         "problem_text": text,
         "topic": topic,
-        "variables": variables,
-        "constraints": constraints,
+        "numbers": numbers,
         "needs_clarification": needs_clarification
     }

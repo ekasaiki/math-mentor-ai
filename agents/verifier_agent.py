@@ -1,9 +1,9 @@
 def verify_solution(parsed, solution):
     if "unable" in solution["answer"].lower():
         return {
-            "confidence": 0.3,
+            "confidence": 0.2,
             "needs_hitl": True,
-            "issues": ["No formula matched"]
+            "issues": ["Solver could not apply a formula"]
         }
 
     return {

@@ -1,90 +1,87 @@
-import re
-
-def extract_numbers(text):
-    return list(map(int, re.findall(r"-?\d+", text)))
-
 def solve_problem(parsed, retrieved_docs):
-    topic = parsed["topic"].lower()
-    question = parsed["problem_text"].lower()
-    docs_text = " ".join(retrieved_docs).lower()
+    text = parsed["problem_text"].lower()
+    nums = parsed.get("numbers", [])
+    topic = parsed["topic"]
 
-    # ==========================
-    # PROBABILITY
-    # ==========================
+    # =========================
+    # PROBABILITY (DICE / COIN)
+    # =========================
     if topic == "probability":
+        if "dice" in text:
+            total_outcomes = 6
 
-        # Detect entity
-        if "dice" in question:
-            total = 6
-        elif "coin" in question:
-            total = 2
-        elif "card" in question:
-            total = 52
-        else:
-            total = None
+            if "getting" in text:
+                favorable = 1
+                return {
+                    "answer": f"{favorable}/{total_outcomes}",
+                    "steps": [
+                        "A fair dice has 6 equally likely outcomes",
+                        "Only one outcome satisfies the event",
+                        "Probability = favorable / total"
+                    ]
+                }
 
-        if total:
-            favorable = 1
+        if "coin" in text:
+            total_outcomes = 2
             return {
-                "answer": f"{favorable}/{total}",
+                "answer": "1/2",
                 "steps": [
-                    f"Total possible outcomes = {total}",
-                    f"Favorable outcomes = {favorable}",
-                    f"Probability = {favorable}/{total}"
+                    "A fair coin has two outcomes",
+                    "Probability = 1 / 2"
                 ]
             }
 
-    # ==========================
-    # ALGEBRA (Linear)
-    # ==========================
+    # =========================
+    # ALGEBRA (LINEAR)
+    # =========================
     if topic == "algebra":
-        nums = extract_numbers(question)
-        if len(nums) >= 2 and "+" in question:
-            c = nums[0]
-            a = nums[1]
-            b = c - a
+        # Example: a + b = 7 where a = 3
+        if len(nums) == 2 and "=" in text:
+            total, known = nums
+            unknown = total - known
             return {
-                "answer": f"b = {b}",
+                "answer": str(unknown),
                 "steps": [
-                    f"Given a + b = {c}",
-                    f"Given a = {a}",
-                    f"b = {c} - {a} = {b}"
+                    f"Given total = {total}",
+                    f"Given known value = {known}",
+                    f"Unknown = {total} − {known}"
                 ]
             }
 
-    # ==========================
-    # LINEAR ALGEBRA (2x2 determinant)
-    # ==========================
-    if topic == "linear algebra" and "determinant" in question:
-        nums = extract_numbers(question)
-        if len(nums) == 4:
-            a, b, c, d = nums
-            det = a * d - b * c
-            return {
-                "answer": str(det),
-                "steps": [
-                    f"Matrix = [[{a},{b}],[{c},{d}]]",
-                    f"Determinant = ({a}×{d}) − ({b}×{c}) = {det}"
-                ]
-            }
+    # =========================
+    # LINEAR ALGEBRA (2×2)
+    # =========================
+    if topic == "linear algebra" and len(nums) == 4:
+        a, b, c, d = nums
+        det = a*d - b*c
+        return {
+            "answer": str(det),
+            "steps": [
+                "Determinant of [[a,b],[c,d]] is ad − bc",
+                f"= {a}×{d} − {b}×{c}",
+                f"= {det}"
+            ]
+        }
 
-    # ==========================
-    # CALCULUS (basic derivative)
-    # ==========================
-    if topic == "calculus":
-        if "x^2" in question or "x²" in question:
-            return {
-                "answer": "2x",
-                "steps": [
-                    "Using power rule",
-                    "d/dx(x²) = 2x"
-                ]
-            }
+    # =========================
+    # CALCULUS (BASIC)
+    # =========================
+    if topic == "calculus" and "x^2" in text:
+        return {
+            "answer": "2x",
+            "steps": [
+                "Using power rule",
+                "d/dx(x²) = 2x"
+            ]
+        }
 
-    # ==========================
-    # FALLBACK
-    # ==========================
+    # =========================
+    # SAFE FAILURE
+    # =========================
     return {
-        "answer": "Unable to solve with available knowledge.",
-        "steps": ["No applicable formula detected."]
+        "answer": "Unable to solve this problem reliably.",
+        "steps": [
+            "Problem structure not supported",
+            "Human review required"
+        ]
     }
