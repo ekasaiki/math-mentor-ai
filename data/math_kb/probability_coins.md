@@ -1,11 +1,12 @@
-# Probability – Coins
+## Probability – Coin Toss
 
-A fair coin has 2 outcomes: {Head, Tail}
+A fair coin has two outcomes:
+{Head, Tail}
 
-Examples:
-- P(Head) = 1/2
-- P(Tail) = 1/2
+Total outcomes = 2
 
-Two coins:
-- Sample space = {HH, HT, TH, TT}
-- P(one head) = 2/4 = 1/2
+Probability of Head = 1 / 2
+Probability of Tail = 1 / 2
+
+For multiple tosses:
+Total outcomes = 2^n (where n = number of tosses)

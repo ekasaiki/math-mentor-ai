@@ -1,10 +1,10 @@
-# Limits
+## Limits – Basic Rules
 
-Limit describes behavior as x approaches a value.
+Limit of a constant:
+lim (x → a) c = c
 
-Examples:
-lim x→0 (x²) = 0  
-lim x→∞ (1/x) = 0
+Limit of a polynomial:
+Substitute x = a
 
-Both left-hand and right-hand limits must exist.
-
+Example:
+lim (x → 2) (x² + 3x) = 4 + 6 = 10

@@ -1,11 +1,10 @@
-## Square Root
-Expression under √ must be ≥ 0
+## Domain Constraints
 
-## Logarithm
-Argument must be > 0
+Probability values must lie between 0 and 1.
 
-## Division
-Denominator must not be zero
+Square root expressions require:
+Value inside root ≥ 0
 
-## Why This Matters
-Violating domain constraints leads to invalid solutions
+Logarithms require:
+Argument > 0
+

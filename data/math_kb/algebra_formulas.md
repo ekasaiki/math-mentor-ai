@@ -1,5 +1,14 @@
-# Algebra Formulas
+## Algebra – Core Formulas
 
-(a + b)² = a² + 2ab + b²  
-(a − b)² = a² − 2ab + b²  
-a² − b² = (a − b)(a + b)
+Linear equation:
+ax + b = 0
+x = -b / a
+
+Quadratic equation:
+ax² + bx + c = 0
+
+Quadratic formula:
+x = (-b ± √(b² - 4ac)) / (2a)
+
+Discriminant:
+D = b² - 4ac

@@ -1,9 +1,15 @@
-# Probability Basics
+## Probability – Basic Formula
 
-Probability of an event:
-P(E) = (Number of favorable outcomes) / (Total outcomes)
+Probability of an event is defined as:
 
-Rules:
-- 0 ≤ P(E) ≤ 1
-- Sum of probabilities of all outcomes = 1
-- Outcomes must be equally likely
+Probability = (Number of favorable outcomes) / (Total number of possible outcomes)
+
+This formula applies only when:
+- All outcomes are equally likely
+- The experiment is random
+
+Used in:
+- Dice problems
+- Coin toss
+- Cards
+- Random selection
