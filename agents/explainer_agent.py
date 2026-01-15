@@ -1,10 +1,15 @@
 def explain_solution(parsed, solution):
-    return f"""
-Step 1: Identify topic → {parsed['topic']}
-Step 2: Apply standard formula
-Step 3: Substitute values
-Step 4: Final answer → {solution['answer']}
+    explanation = []
 
-Explanation:
-{solution['method']}
-"""
+    explanation.append(f"Topic identified: {parsed.get('topic')}")
+
+    explanation.append(f"Method used: {solution.get('method', 'N/A')}")
+    explanation.append(f"Formula used: {solution.get('used_formula', 'N/A')}")
+
+    explanation.append("Steps:")
+    for step in solution.get("steps", []):
+        explanation.append(f"- {step}")
+
+    explanation.append(f"Final Answer: {solution.get('answer')}")
+
+    return "\n".join(explanation)
