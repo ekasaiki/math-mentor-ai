@@ -1,4 +1,10 @@
 def explain_solution(parsed, solution):
-    return "\n".join(
-        [f"Step {i+1}: {step}" for i, step in enumerate(solution["steps"])]
-    )
+    return f"""
+Step 1: Identify topic → {parsed['topic']}
+Step 2: Apply standard formula
+Step 3: Substitute values
+Step 4: Final answer → {solution['answer']}
+
+Explanation:
+{solution['method']}
+"""

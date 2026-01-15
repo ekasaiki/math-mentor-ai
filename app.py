@@ -14,6 +14,10 @@ from rag.retriever import build_vectorstore, retrieve_context
 # -------- Memory --------
 from memory.memory_store import save_to_memory, find_similar_by_topic
 
+# -------- Multimodal --------
+from multimodal.ocr import extract_text_from_image
+from multimodal.asr import transcribe_audio
+
 
 # =============================
 # Streamlit Config
@@ -24,18 +28,14 @@ st.write("Multimodal AI Tutor for JEE-style Math Problems")
 
 
 # =============================
-# Session State (PERSISTENCE)
+# FIX 1️⃣: Session State (ANSWER PERSISTENCE)
 # =============================
 if "final_answer" not in st.session_state:
     st.session_state.final_answer = None
-    st.session_state.explanation = None
-    st.session_state.confidence = None
-    st.session_state.intent = None
-    st.session_state.retrieved_docs = []
 
 
 # =============================
-# Load Vector Store
+# Load Vector Store (Cached)
 # =============================
 @st.cache_resource
 def load_vectorstore():
@@ -77,16 +77,15 @@ if input_mode == "Text":
 
 
 # =============================
-# IMAGE INPUT (OCR)
+# IMAGE INPUT
 # =============================
 elif input_mode == "Image":
-    from multimodal.ocr import extract_text_from_image
-
     image = st.file_uploader("📷 Upload image", type=["jpg", "jpeg", "png"])
+
     if image:
         extracted_text, confidence = extract_text_from_image(image)
-        st.write(f"OCR Confidence: {confidence}")
 
+        st.write(f"OCR Confidence: {confidence}")
         if confidence < 0.75:
             hitl_panel("Low OCR confidence")
 
@@ -94,16 +93,15 @@ elif input_mode == "Image":
 
 
 # =============================
-# AUDIO INPUT (ASR)
+# AUDIO INPUT
 # =============================
 elif input_mode == "Audio":
-    from multimodal.asr import transcribe_audio
-
     audio_bytes = st.audio_input("🎤 Record your math question")
+
     if audio_bytes:
         transcript, confidence = transcribe_audio(audio_bytes)
-        st.write(f"ASR Confidence: {confidence}")
 
+        st.write(f"ASR Confidence: {confidence}")
         if confidence < 0.75:
             hitl_panel("Low ASR confidence")
 
@@ -122,53 +120,69 @@ solve = st.button("🚀 Solve Problem")
 # =============================
 if solve and user_text.strip():
 
-    # -------- 1️⃣ Parser Agent --------
+    # 1️⃣ Parser Agent
     parsed = parse_problem(user_text)
     st.subheader("🧠 Parsed Problem")
     st.json(parsed)
 
     if parsed["needs_clarification"]:
-        if hitl_panel("Parser detected ambiguity") != "Approve":
+        decision = hitl_panel("Parser detected ambiguity")
+        if decision != "Approve":
             st.stop()
 
-    # -------- 2️⃣ Intent Router --------
-    intent = route_intent(parsed)
-    st.session_state.intent = intent
+    # 2️⃣ Intent Router
+    route = route_intent(parsed)
+    st.subheader("🧭 Intent Router")
+    st.info(f"Routed to: {route}")
 
-    # -------- 3️⃣ Memory Lookup --------
+    # 3️⃣ Memory Lookup
     past_cases = find_similar_by_topic(parsed["topic"])
     if past_cases:
         st.subheader("🧠 Similar Past Problems (Memory)")
         for case in past_cases:
             st.info(f"Past answer: {case['final_answer']}")
 
-    # -------- 4️⃣ RAG Retrieval --------
+    # 4️⃣ RAG Retrieval
     retrieved_docs = retrieve_context(vectorstore, parsed["problem_text"])
-    st.session_state.retrieved_docs = retrieved_docs
 
+    st.subheader("📚 Retrieved Context")
+
+    # FIX 2️⃣: Stop if no docs
     if not retrieved_docs:
         st.warning("No relevant documents retrieved.")
         st.stop()
 
-    # -------- 5️⃣ Solver --------
+    # FIX 3️⃣: Display docs safely
+    for i, doc in enumerate(retrieved_docs):
+        st.markdown(f"*Source {i+1}:*")
+        st.info(doc)
+
+    # 5️⃣ Solver Agent (FORMULA-BASED)
     solution = solve_problem(parsed, retrieved_docs)
 
-    # -------- 6️⃣ Verifier --------
+    st.subheader("✅ Final Answer")
+
+    # FIX 1️⃣: Persist answer
+    st.session_state.final_answer = solution["answer"]
+    st.success(st.session_state.final_answer)
+
+    # 6️⃣ Verifier Agent
     verification = verify_solution(parsed, solution)
 
-    if verification["needs_hitl"]:
-        if hitl_panel("Verifier not confident") != "Approve":
+    st.subheader("📊 Confidence")
+    st.progress(verification.get("confidence", 0.8))
+
+    if verification.get("needs_hitl"):
+        decision = hitl_panel("Verifier not confident")
+        if decision != "Approve":
             st.stop()
 
-    # -------- 7️⃣ Explainer --------
+    # 7️⃣ Explainer Agent
     explanation = explain_solution(parsed, solution)
+    st.subheader("📖 Explanation")
+    st.write(explanation)
 
-    # -------- Persist results --------
-    st.session_state.final_answer = solution["answer"]
-    st.session_state.explanation = explanation
-    st.session_state.confidence = verification["confidence"]
-
-    # -------- Save to Memory --------
+    # 8️⃣ Save to Memory
     save_to_memory({
         "timestamp": str(datetime.now()),
         "original_input": user_text,
@@ -178,62 +192,36 @@ if solve and user_text.strip():
         "verifier": verification
     })
 
-
-# =============================
-# 🧩 AGENT TRACE (PERSISTENT)
-# =============================
-if st.session_state.intent:
-    st.divider()
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.subheader("🧩 Agent Trace")
-        st.write("• Parser Agent ✅")
-        st.write(f"• Intent Router → **{st.session_state.intent}**")
-        st.write("• Solver Agent")
-        st.write("• Verifier Agent")
-        st.write("• Explainer Agent")
-
-    with col2:
-        st.subheader("📚 Retrieved Context")
-        for i, doc in enumerate(st.session_state.retrieved_docs):
-            st.markdown(f"**Source {i+1}:**")
-            st.info(doc)
-
-
-# =============================
-# ✅ FINAL OUTPUT (PERSISTENT)
-# =============================
-if st.session_state.final_answer:
-
-    st.divider()
-    st.subheader("✅ Final Answer")
-    st.success(st.session_state.final_answer)
-
-    st.subheader("📖 Explanation")
-    st.write(st.session_state.explanation)
-
-    st.subheader("📊 Confidence")
-    st.progress(st.session_state.confidence)
-
-    # -------- Feedback --------
+    # 9️⃣ Feedback (HITL)
     st.subheader("🧠 Feedback")
     c1, c2 = st.columns(2)
 
     with c1:
         if st.button("✅ Correct"):
+            save_to_memory({
+                "timestamp": str(datetime.now()),
+                "original_input": user_text,
+                "parsed_problem": parsed,
+                "final_answer": solution["answer"],
+                "user_feedback": "correct"
+            })
             st.success("Feedback saved.")
 
     with c2:
         if st.button("❌ Incorrect"):
+            save_to_memory({
+                "timestamp": str(datetime.now()),
+                "original_input": user_text,
+                "parsed_problem": parsed,
+                "final_answer": solution["answer"],
+                "user_feedback": "incorrect"
+            })
             st.warning("Feedback saved.")
 
-    # -------- Explicit HITL --------
+    # 🔁 User Re-check
     st.subheader("🔁 Request Re-check")
     if st.button("Ask Human to Re-check"):
-        if hitl_panel("User explicitly requested re-check") != "Approve":
+        decision = hitl_panel("User explicitly requested re-check")
+        if decision != "Approve":
             st.stop()
-
-
-    
     
