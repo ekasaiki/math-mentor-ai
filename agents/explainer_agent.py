@@ -1,14 +1,11 @@
 def explain_solution(parsed, solution):
     lines = []
+    lines.append(f"Topic identified: {parsed['topic']}")
 
-    lines.append(f"Topic identified: {parsed.get('topic', 'Unknown')}")
+    if solution.get("used_formula"):
+        lines.append(f"Formula used: {solution['used_formula']}")
 
-    # SAFE access (NO KeyError ever)
-    formula = solution.get("used_formula", "Formula not available")
-    method = solution.get("method", "Method not specified")
-
-    lines.append(f"Method used: {method}")
-    lines.append(f"Formula applied: {formula}")
-    lines.append("Steps followed logically to reach the final answer.")
+    lines.append(f"Method: {solution.get('method', 'N/A')}")
+    lines.append(f"Final Answer: {solution['answer']}")
 
     return "\n".join(lines)

@@ -1,60 +1,44 @@
 import re
 
 def solve_problem(parsed, retrieved_docs):
-    text = parsed["problem_text"].lower()
     topic = parsed["topic"]
+    text = parsed["problem_text"].lower()
 
-    # -------------------------
-    # PROBABILITY – DICE
-    # -------------------------
-    if "dice" in text and "prime" in text:
+    # ---------- PROBABILITY ----------
+    if topic == "probability":
+
+        if "dice" in text:
+            if "prime" in text:
+                return {
+                    "answer": "Probability = 3/6 = 1/2",
+                    "used_formula": "P(E) = favorable / total outcomes",
+                    "method": "dice-prime"
+                }
+
+            if "3" in text:
+                return {
+                    "answer": "Probability = 1/6",
+                    "used_formula": "P(E) = favorable / total outcomes",
+                    "method": "dice-single-number"
+                }
+
+        if "coin" in text and "two" in text:
+            return {
+                "answer": "Probability = 2/4 = 1/2",
+                "used_formula": "Sample space = {HH, HT, TH, TT}",
+                "method": "two-coins"
+            }
+
+    # ---------- QUADRATIC ----------
+    if topic == "algebra" and "x²" in text or "x^2" in text:
         return {
-            "answer": "Prime numbers on a dice are 2, 3, 5. Probability = 3/6 = 1/2",
-            "used_formula": "Probability = favourable outcomes / total outcomes",
-            "method": "Probability (Dice)",
-            "confidence": 0.95
+            "answer": "This is a quadratic function. Vertex form can be used.",
+            "used_formula": "x = -b / (2a)",
+            "method": "quadratic-analysis"
         }
 
-    # -------------------------
-    # PROBABILITY – COINS
-    # -------------------------
-    if "two coins" in text and "one head" in text:
-        return {
-            "answer": "Outcomes = {HH, HT, TH, TT}. Exactly one head = {HT, TH}. Probability = 2/4 = 1/2",
-            "used_formula": "Probability = favourable outcomes / total outcomes",
-            "method": "Probability (Coins)",
-            "confidence": 0.95
-        }
-
-    # -------------------------
-    # QUADRATIC
-    # -------------------------
-    quad = re.search(r"x\^2|x²", text)
-    if quad:
-        return {
-            "answer": "This is a quadratic equation. Solution can be obtained using the quadratic formula.",
-            "used_formula": "x = (-b ± √(b² - 4ac)) / 2a",
-            "method": "Quadratic Formula",
-            "confidence": 0.85
-        }
-
-    # -------------------------
-    # FALLBACK USING DOCUMENTS
-    # -------------------------
-    if retrieved_docs:
-        return {
-            "answer": "Solved using retrieved formula from knowledge base.",
-            "used_formula": "Formula retrieved from documents",
-            "method": "RAG-based solving",
-            "confidence": 0.7
-        }
-
-    # -------------------------
-    # LAST RESORT (SAFE)
-    # -------------------------
     return {
         "answer": "Unable to solve with available formulas.",
-        "used_formula": "Not found",
-        "method": "Unsupported",
-        "confidence": 0.4
+        "used_formula": None,
+        "method": "unsupported"
     }

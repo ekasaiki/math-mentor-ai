@@ -1,27 +1,29 @@
-# rag/retriever.py
 import os
 
 KB_PATH = "data/math_kb"
 
-def retrieve_context(query: str, top_k: int = 3):
-    """
-    Simple keyword-based retrieval (EXAM SAFE)
-    """
-    results = []
-    query_lower = query.lower()
+def build_vectorstore():
+    documents = []
 
     for file in os.listdir(KB_PATH):
-        if not file.endswith(".md"):
-            continue
-
-        with open(os.path.join(KB_PATH, file), "r", encoding="utf-8") as f:
-            content = f.read()
-
-            # simple keyword match
-            if any(word in content.lower() for word in query_lower.split()):
-                results.append({
+        if file.endswith(".md"):
+            with open(os.path.join(KB_PATH, file), "r", encoding="utf-8") as f:
+                documents.append({
                     "source": file,
-                    "content": content
+                    "content": f.read().lower()
                 })
 
-    return results[:top_k]
+    return documents
+
+
+def retrieve_context(vectorstore, query, k=3):
+    query = query.lower()
+    matches = []
+
+    for doc in vectorstore:
+        score = sum(1 for word in query.split() if word in doc["content"])
+        if score > 0:
+            matches.append((score, doc))
+
+    matches.sort(reverse=True, key=lambda x: x[0])
+    return [m[1]["content"] for m in matches[:k]]
