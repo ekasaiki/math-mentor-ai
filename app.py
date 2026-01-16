@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime
 
 # =============================
-# Import Agents
+# Agents
 # =============================
 from agents.parser_agent import parse_problem
 from agents.intent_router import route_intent
@@ -11,44 +11,98 @@ from agents.verifier_agent import verify_solution
 from agents.explainer_agent import explain_solution
 
 # =============================
-# Streamlit Page Config
+# Optional Multimodal Imports
 # =============================
-st.set_page_config(
-    page_title="Math Mentor AI",
-    layout="wide"
-)
+IMAGE_AVAILABLE = True
+AUDIO_AVAILABLE = True
 
+try:
+    from multimodal.ocr import extract_text_from_image
+except Exception:
+    IMAGE_AVAILABLE = False
+
+try:
+    from multimodal.asr import transcribe_audio
+except Exception:
+    AUDIO_AVAILABLE = False
+
+# =============================
+# Streamlit Config
+# =============================
+st.set_page_config(page_title="Math Mentor AI", layout="wide")
 st.title("🧠 Math Mentor AI")
-st.caption("Formula-based Multimodal Math Tutor (Probability • Algebra • Calculus)")
-
+st.caption("Formula-based Multimodal Math Tutor (Text • Image • Audio)")
 st.divider()
 
 # =============================
-# User Input
+# Input Mode
 # =============================
-user_question = st.text_area(
-    "Enter your math question",
-    placeholder="Example: Two coins are tossed. What is the probability of getting exactly one head?",
-    height=120
+input_mode = st.radio(
+    "Choose input type:",
+    ["Text", "Image", "Audio"],
+    horizontal=True
 )
 
+user_text = ""
+
+# =============================
+# TEXT INPUT
+# =============================
+if input_mode == "Text":
+    user_text = st.text_area(
+        "✍️ Enter your math problem",
+        height=120,
+        placeholder="Example: Two coins are tossed. What is the probability of getting exactly one head?"
+    )
+
+# =============================
+# IMAGE INPUT (OCR)
+# =============================
+elif input_mode == "Image":
+    if not IMAGE_AVAILABLE:
+        st.error("OCR is not available in this environment.")
+    else:
+        image = st.file_uploader("📷 Upload image", type=["png", "jpg", "jpeg"])
+        if image:
+            extracted_text, confidence = extract_text_from_image(image)
+
+            st.subheader("🖼 OCR Output")
+            st.write(f"Confidence: {confidence}")
+            user_text = st.text_area("Extracted text (editable)", extracted_text)
+
+# =============================
+# AUDIO INPUT (ASR)
+# =============================
+elif input_mode == "Audio":
+    if not AUDIO_AVAILABLE:
+        st.error("Audio transcription is not available in this environment.")
+    else:
+        audio = st.audio_input("🎤 Record your math question")
+        if audio:
+            transcript, confidence = transcribe_audio(audio)
+
+            st.subheader("🎧 ASR Output")
+            st.write(f"Confidence: {confidence}")
+            user_text = st.text_area("Transcribed text (editable)", transcript)
+
+st.divider()
 solve_btn = st.button("🚀 Solve Problem")
 
 # =============================
-# Main Pipeline
+# MAIN PIPELINE
 # =============================
-if solve_btn and user_question.strip():
+if solve_btn and user_text.strip():
 
     # -------------------------
     # 1️⃣ Parser Agent
     # -------------------------
-    parsed = parse_problem(user_question)
+    parsed = parse_problem(user_text)
 
     st.subheader("🧠 Parser Agent")
     st.json(parsed)
 
     if parsed.get("needs_clarification"):
-        st.error("Parser could not confidently identify the topic.")
+        st.error("Parser could not clearly identify the problem.")
         st.stop()
 
     # -------------------------
@@ -57,19 +111,18 @@ if solve_btn and user_question.strip():
     intent = route_intent(parsed)
 
     st.subheader("🧭 Intent Router")
-    st.write(f"Detected topic: *{intent}*")
+    st.success(f"Detected topic: {intent}")
 
     # -------------------------
-    # 3️⃣ Solver Agent
+    # 3️⃣ Solver Agent (FORMULA-BASED)
     # -------------------------
     solution = solve_problem(parsed, docs=[])
 
     st.subheader("🧮 Solver Agent")
     st.json(solution)
 
-    # Safety check (prevents KeyError)
     if "answer" not in solution:
-        st.error("Solver failed to produce an answer.")
+        st.error("Solver could not generate an answer.")
         st.stop()
 
     # -------------------------
@@ -89,29 +142,27 @@ if solve_btn and user_question.strip():
     st.text(explanation)
 
     # -------------------------
-    # Final Answer (Pinned – NO VANISH)
+    # FINAL ANSWER (PINNED – NO VANISH)
     # -------------------------
     st.divider()
     st.subheader("✅ Final Answer")
     st.success(solution["answer"])
 
     # -------------------------
-    # Confidence Bar
+    # CONFIDENCE
     # -------------------------
     st.subheader("📊 Confidence")
-    st.progress(verification.get("confidence", 0.5))
+    st.progress(verification.get("confidence", 0.7))
 
     # -------------------------
-    # Feedback (Optional)
+    # FEEDBACK
     # -------------------------
     st.subheader("🧠 Feedback")
     c1, c2 = st.columns(2)
-
     with c1:
         st.button("✅ Correct")
-
     with c2:
         st.button("❌ Incorrect")
 
 else:
-    st.info("Enter a math problem and click *Solve Problem*.")
+    st.info("Provide input and click *Solve Problem*.")
