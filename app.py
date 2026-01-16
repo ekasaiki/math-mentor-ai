@@ -1,121 +1,117 @@
 import streamlit as st
 from datetime import datetime
 
-# ====== Agents ======
+# =============================
+# Import Agents
+# =============================
 from agents.parser_agent import parse_problem
 from agents.intent_router import route_intent
 from agents.solver_agent import solve_problem
 from agents.verifier_agent import verify_solution
 from agents.explainer_agent import explain_solution
 
-# ====== RAG ======
-from rag.retriever import build_vectorstore, retrieve_context
-
-# ====== Memory ======
-from memory.memory_store import save_to_memory
-
 # =============================
-# Streamlit Config
+# Streamlit Page Config
 # =============================
-st.set_page_config(page_title="Math Mentor AI", layout="wide")
+st.set_page_config(
+    page_title="Math Mentor AI",
+    layout="wide"
+)
+
 st.title("🧠 Math Mentor AI")
-st.caption("Reliable Multimodal Math Mentor (RAG + Agents + HITL + Memory)")
+st.caption("Formula-based Multimodal Math Tutor (Probability • Algebra • Calculus)")
+
+st.divider()
 
 # =============================
-# Cache Vector Store
+# User Input
 # =============================
-@st.cache_resource
-def load_vs():
-    return build_vectorstore()
+user_question = st.text_area(
+    "Enter your math question",
+    placeholder="Example: Two coins are tossed. What is the probability of getting exactly one head?",
+    height=120
+)
 
-vectorstore = load_vs()
-
-# =============================
-# Session State (PREVENT VANISH)
-# =============================
-if "result" not in st.session_state:
-    st.session_state.result = None
+solve_btn = st.button("🚀 Solve Problem")
 
 # =============================
-# Input Mode
+# Main Pipeline
 # =============================
-input_mode = st.radio("Choose input type:", ["Text", "Image", "Audio"])
+if solve_btn and user_question.strip():
 
-user_text = ""
+    # -------------------------
+    # 1️⃣ Parser Agent
+    # -------------------------
+    parsed = parse_problem(user_question)
 
-if input_mode == "Text":
-    user_text = st.text_area("✍️ Enter math problem", height=120)
-
-elif input_mode == "Image":
-    from multimodal.ocr import extract_text_from_image
-    img = st.file_uploader("📷 Upload image", type=["jpg", "png"])
-    if img:
-        text, conf = extract_text_from_image(img)
-        st.info(f"OCR Confidence: {conf}")
-        user_text = st.text_area("Extracted Text", text)
-
-elif input_mode == "Audio":
-    from multimodal.asr import transcribe_audio
-    audio = st.audio_input("🎤 Speak problem")
-    if audio:
-        text, conf = transcribe_audio(audio)
-        st.info(f"ASR Confidence: {conf}")
-        user_text = st.text_area("Transcript", text)
-
-# =============================
-# Solve Button
-# =============================
-if st.button("🚀 Solve Problem") and user_text.strip():
-
-    st.session_state.result = {}
-
-    # ===== Parser Agent =====
-    parsed = parse_problem(user_text)
     st.subheader("🧠 Parser Agent")
     st.json(parsed)
-    st.session_state.result["parsed"] = parsed
 
-    # ===== Intent Router =====
+    if parsed.get("needs_clarification"):
+        st.error("Parser could not confidently identify the topic.")
+        st.stop()
+
+    # -------------------------
+    # 2️⃣ Intent Router
+    # -------------------------
     intent = route_intent(parsed)
-    st.subheader("🧭 Intent Router Agent")
-    st.success(intent)
 
-    # ===== RAG Retriever =====
-    docs = retrieve_context(vectorstore, parsed["problem_text"])
-    st.subheader("📚 RAG Retriever")
-    for i, d in enumerate(docs):
-        st.info(f"Source {i+1}: {d}")
+    st.subheader("🧭 Intent Router")
+    st.write(f"Detected topic: *{intent}*")
 
-    # ===== Solver Agent =====
-    solution = solve_problem(parsed, docs)
+    # -------------------------
+    # 3️⃣ Solver Agent
+    # -------------------------
+    solution = solve_problem(parsed, docs=[])
+
     st.subheader("🧮 Solver Agent")
-    st.success(solution["answer"])
-    st.code(solution["reasoning"])
+    st.json(solution)
 
-    # ===== Verifier Agent =====
-    verify = verify_solution(parsed, solution)
+    # Safety check (prevents KeyError)
+    if "answer" not in solution:
+        st.error("Solver failed to produce an answer.")
+        st.stop()
+
+    # -------------------------
+    # 4️⃣ Verifier Agent
+    # -------------------------
+    verification = verify_solution(parsed, solution)
+
     st.subheader("🔍 Verifier Agent")
-    st.json(verify)
+    st.json(verification)
 
-    # ===== Explainer Agent =====
+    # -------------------------
+    # 5️⃣ Explainer Agent
+    # -------------------------
     explanation = explain_solution(parsed, solution)
+
     st.subheader("📖 Explainer Agent")
-    st.write(explanation)
+    st.text(explanation)
 
-    # ===== Memory Save =====
-    save_to_memory({
-        "time": str(datetime.now()),
-        "question": user_text,
-        "parsed": parsed,
-        "answer": solution["answer"]
-    })
-
-    st.session_state.result["final"] = solution["answer"]
-
-# =============================
-# Persist Final Answer
-# =============================
-if st.session_state.result:
+    # -------------------------
+    # Final Answer (Pinned – NO VANISH)
+    # -------------------------
     st.divider()
-    st.subheader("✅ Final Answer (Persisted)")
-    st.success(st.session_state.result.get("final", ""))
+    st.subheader("✅ Final Answer")
+    st.success(solution["answer"])
+
+    # -------------------------
+    # Confidence Bar
+    # -------------------------
+    st.subheader("📊 Confidence")
+    st.progress(verification.get("confidence", 0.5))
+
+    # -------------------------
+    # Feedback (Optional)
+    # -------------------------
+    st.subheader("🧠 Feedback")
+    c1, c2 = st.columns(2)
+
+    with c1:
+        st.button("✅ Correct")
+
+    with c2:
+        st.button("❌ Incorrect")
+
+else:
+    st.info("Enter a math problem and click *Solve Problem*.")

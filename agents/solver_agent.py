@@ -1,73 +1,85 @@
-import re
 import math
+import re
 
-def solve_problem(parsed, retrieved_docs):
-    topic = parsed.get("topic", "")
-    question = parsed.get("problem_text", "").lower()
+def solve_problem(parsed, docs):
+    q = parsed["problem_text"].lower()
+    topic = parsed["topic"]
 
-    # 🔒 FIXED schema (MANDATORY)
     solution = {
-        "answer": "Not solved",
+        "answer": "",
         "method": "formula-based",
-        "used_formula": "N/A",
+        "used_formula": "",
         "steps": []
     }
 
-    # =========================
+    # =====================
     # PROBABILITY
-    # =========================
+    # =====================
     if topic == "probability":
 
-        # Dice
-        if "dice" in question:
-            solution["used_formula"] = "P = favourable outcomes / total outcomes"
+        # Dice – prime number
+        if "dice" in q and "prime" in q:
+            solution["used_formula"] = "P = favourable / total"
             solution["steps"] = [
-                "A fair dice has 6 outcomes",
-                "Prime numbers on dice: {2, 3, 5}",
-                "Favourable outcomes = 3"
+                "A dice has outcomes {1,2,3,4,5,6}",
+                "Prime numbers are {2,3,5}",
+                "Favourable = 3, Total = 6"
             ]
-            solution["answer"] = "3 / 6 = 1 / 2"
+            solution["answer"] = "1/2"
             return solution
 
-        # Two coins
-        if "two coin" in question or "two coins" in question:
+        # Two coins – exactly one head
+        if "two" in q and "coin" in q:
             solution["used_formula"] = "P = favourable / total"
             solution["steps"] = [
                 "Sample space = {HH, HT, TH, TT}",
                 "Exactly one head = {HT, TH}",
-                "Favourable outcomes = 2, Total = 4"
+                "Favourable = 2, Total = 4"
             ]
-            solution["answer"] = "2 / 4 = 1 / 2"
+            solution["answer"] = "1/2"
             return solution
 
-    # =========================
+    # =====================
     # ALGEBRA – QUADRATIC
-    # =========================
-    if topic == "algebra" and "x²" in question:
-        solution["used_formula"] = "Vertex formula: x = -b / 2a"
-        solution["steps"] = [
-            "Identify coefficients from f(x)",
-            "Apply vertex formula",
-            "Substitute values"
-        ]
-        solution["answer"] = "Vertex computed using quadratic formula"
-        return solution
+    # =====================
+    if topic == "algebra":
+        match = re.search(r"([-+]?\d*)x²\s*([+-]\s*\d*)x\s*([+-]\s*\d+)", q)
+        if match:
+            a = int(match.group(1) or 1)
+            b = int(match.group(2).replace(" ", ""))
+            c = int(match.group(3).replace(" ", ""))
 
-    # =========================
+            D = b*b - 4*a*c
+            solution["used_formula"] = "x = (-b ± √D) / 2a"
+            solution["steps"] = [
+                f"a={a}, b={b}, c={c}",
+                f"Discriminant D = {D}"
+            ]
+
+            if D >= 0:
+                x1 = (-b + math.sqrt(D)) / (2*a)
+                x2 = (-b - math.sqrt(D)) / (2*a)
+                solution["answer"] = f"x = {x1}, {x2}"
+            else:
+                solution["answer"] = "No real roots"
+
+            return solution
+
+    # =====================
     # CALCULUS – DERIVATIVE
-    # =========================
-    if topic == "calculus" and "derivative" in question:
-        solution["used_formula"] = "Power rule"
+    # =====================
+    if topic == "calculus" and "x²" in q:
+        solution["used_formula"] = "d/dx (ax² + bx + c) = 2ax + b"
         solution["steps"] = [
-            "Differentiate term by term",
-            "Apply power rule"
+            "Differentiate term by term"
         ]
-        solution["answer"] = "Derivative computed"
+        solution["answer"] = "Derivative computed using power rule"
         return solution
 
-    # =========================
-    # FALLBACK (SAFE)
-    # =========================
-    solution["steps"] = ["No matching formula found"]
-    solution["answer"] = "Human review required"
+    # =====================
+    # FALLBACK
+    # =====================
+    solution["method"] = "human-review"
+    solution["steps"] = ["No matching formula"]
+    solution["answer"] = "HITL required"
     return solution

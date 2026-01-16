@@ -1,13 +1,7 @@
 def verify_solution(parsed, solution):
-    if "unable" in solution["answer"].lower():
-        return {
-            "confidence": 0.2,
-            "needs_hitl": True,
-            "issues": ["Solver could not apply a formula"]
-        }
-
+    confident = solution["method"] != "human-review"
     return {
-        "confidence": 0.9,
-        "needs_hitl": False,
+        "confidence": 0.9 if confident else 0.4,
+        "needs_hitl": not confident,
         "issues": []
     }

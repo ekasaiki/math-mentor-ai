@@ -1,25 +1,19 @@
 import re
 
 def parse_problem(text):
-    text = text.strip()
+    text_l = text.lower()
 
-    topic = "unknown"
-    if "dice" in text or "coin" in text or "probability" in text:
+    if any(k in text_l for k in ["dice", "coin", "probability", "card"]):
         topic = "probability"
-    elif "determinant" in text:
-        topic = "linear algebra"
-    elif "find derivative" in text or "differentiate" in text:
-        topic = "calculus"
-    elif "=" in text:
+    elif any(k in text_l for k in ["x²", "quadratic", "ax²"]):
         topic = "algebra"
-
-    numbers = list(map(int, re.findall(r"-?\d+", text)))
-
-    needs_clarification = len(numbers) == 0
+    elif any(k in text_l for k in ["derivative", "limit", "maximum", "minimum"]):
+        topic = "calculus"
+    else:
+        topic = "unknown"
 
     return {
-        "problem_text": text,
         "topic": topic,
-        "numbers": numbers,
-        "needs_clarification": needs_clarification
+        "problem_text": text,
+        "needs_clarification": topic == "unknown"
     }
