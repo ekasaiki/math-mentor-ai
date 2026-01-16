@@ -11,7 +11,7 @@ from agents.verifier_agent import verify_solution
 from agents.explainer_agent import explain_solution
 
 # =============================
-# RAG
+# RAG (NO LANGCHAIN)
 # =============================
 from rag.retriever import build_vectorstore, retrieve_context
 
@@ -22,31 +22,31 @@ from multimodal.ocr import extract_text_from_image
 from multimodal.asr import transcribe_audio
 
 # =============================
-# Memory
-# =============================
-from memory.memory_store import save_to_memory, find_similar_by_topic
-
-
-# =============================
 # Streamlit Config
 # =============================
 st.set_page_config(page_title="Math Mentor AI", layout="wide")
 st.title("🧠 Math Mentor AI")
-st.caption("Multimodal AI Tutor for JEE-style Math Problems")
+st.caption("Reliable Multimodal Math Mentor (Text • Image • Audio)")
 
 # =============================
-# Load Vector Store
+# SESSION STATE (ANTI-VANISH)
+# =============================
+if "solution_data" not in st.session_state:
+    st.session_state.solution_data = None
+
+# =============================
+# Load KB (cached)
 # =============================
 @st.cache_resource
-def load_vectorstore():
+def load_kb():
     return build_vectorstore()
 
-vectorstore = load_vectorstore()
+kb = load_kb()
 
 # =============================
 # HITL PANEL
 # =============================
-def hitl_panel(reason: str):
+def hitl_panel(reason):
     st.warning(f"🧑‍⚖️ HITL Triggered: {reason}")
     return st.radio(
         "Human Review Required:",
@@ -57,35 +57,38 @@ def hitl_panel(reason: str):
 # =============================
 # INPUT MODE
 # =============================
-input_mode = st.radio("Choose input type:", ["Text", "Image", "Audio"])
-st.divider()
+input_mode = st.radio(
+    "Choose input type:",
+    ["Text", "Image", "Audio"]
+)
 
+st.divider()
 user_text = ""
 
 # =============================
 # TEXT INPUT
 # =============================
 if input_mode == "Text":
-    user_text = st.text_area("✍️ Enter math problem", height=150)
+    user_text = st.text_area("✍️ Enter your math question", height=140)
 
 # =============================
-# IMAGE INPUT (OCR)
+# IMAGE INPUT
 # =============================
 elif input_mode == "Image":
-    image = st.file_uploader("📷 Upload math image", ["png", "jpg", "jpeg"])
+    image = st.file_uploader("📷 Upload image", ["jpg", "jpeg", "png"])
     if image:
         extracted_text, confidence = extract_text_from_image(image)
-        st.info(f"OCR confidence: {confidence}")
+        st.info(f"OCR Confidence: {confidence}")
         user_text = st.text_area("Extracted text (editable)", extracted_text)
 
 # =============================
-# AUDIO INPUT (ASR)
+# AUDIO INPUT
 # =============================
 elif input_mode == "Audio":
     audio = st.audio_input("🎤 Record your question")
     if audio:
         transcript, confidence = transcribe_audio(audio)
-        st.info(f"ASR confidence: {confidence}")
+        st.info(f"ASR Confidence: {confidence}")
         user_text = st.text_area("Transcribed text (editable)", transcript)
 
 # =============================
@@ -95,87 +98,69 @@ st.divider()
 solve = st.button("🚀 Solve Problem")
 
 # =============================
-# MAIN PIPELINE
+# RUN PIPELINE ONCE
 # =============================
 if solve and user_text.strip():
 
-    # -------- Parser Agent --------
-    st.subheader("🧠 Parser Agent")
     parsed = parse_problem(user_text)
-    st.json(parsed)
 
     if parsed.get("needs_clarification"):
         if hitl_panel("Parser ambiguity") != "Approve":
             st.stop()
 
-    # -------- Intent Router --------
-    st.subheader("🧭 Intent Router")
     route = route_intent(parsed)
-    st.success(route)
-
-    # -------- Memory Lookup --------
-    st.subheader("🧠 Memory Agent")
-    past = find_similar_by_topic(parsed["topic"])
-    if past:
-        for p in past:
-            st.info(p["final_answer"])
-    else:
-        st.caption("No similar past problems")
-
-    # -------- RAG Retriever --------
-    st.subheader("📚 RAG Retriever")
-    retrieved_docs = retrieve_context(vectorstore, parsed["problem_text"])
-
-    if not retrieved_docs:
-        st.error("No relevant documents found")
-        st.stop()
-
-    for i, doc in enumerate(retrieved_docs):
-        st.markdown(f"*Doc {i+1}*")
-        st.code(doc, language="markdown")
-
-    # -------- Solver Agent --------
-    st.subheader("🧮 Solver Agent")
+    retrieved_docs = retrieve_context(kb, parsed["problem_text"])
     solution = solve_problem(parsed, retrieved_docs)
-
-    st.success(solution.get("answer", "No answer generated"))
-    st.json({
-        "used_formula": solution.get("used_formula", "Not found"),
-        "method": solution.get("method", "Not found")
-    })
-
-    # -------- Verifier Agent --------
-    st.subheader("✅ Verifier Agent")
     verification = verify_solution(parsed, solution)
-    st.progress(verification.get("confidence", 0.5))
-
-    if verification.get("needs_hitl"):
-        if hitl_panel("Low confidence") != "Approve":
-            st.stop()
-
-    # -------- Explainer Agent --------
-    st.subheader("📖 Explainer Agent")
     explanation = explain_solution(parsed, solution)
-    st.write(explanation)
 
-    # -------- Save to Memory --------
-    save_to_memory({
-        "timestamp": str(datetime.now()),
-        "original_input": user_text,
-        "parsed_problem": parsed,
-        "retrieved_context": retrieved_docs,
-        "final_answer": solution.get("answer"),
-        "confidence": verification.get("confidence")
+    # STORE EVERYTHING (KEY FIX)
+    st.session_state.solution_data = {
+        "parsed": parsed,
+        "route": route,
+        "retrieved_docs": retrieved_docs,
+        "solution": solution,
+        "verification": verification,
+        "explanation": explanation
+    }
+
+# =============================
+# DISPLAY RESULTS (NO VANISH)
+# =============================
+if st.session_state.solution_data:
+
+    data = st.session_state.solution_data
+
+    st.subheader("🧠 Parser Agent")
+    st.json(data["parsed"])
+
+    st.subheader("🧭 Intent Router")
+    st.success(data["route"])
+
+    st.subheader("📚 Retrieved Documents")
+    if data["retrieved_docs"]:
+        for i, doc in enumerate(data["retrieved_docs"]):
+            st.markdown(f"*Document {i+1}*")
+            st.code(doc[:800])
+    else:
+        st.info("No documents retrieved")
+
+    st.subheader("🧮 Solver Agent")
+    st.success(data["solution"].get("answer", "No answer"))
+    st.json({
+        "used_formula": data["solution"].get("used_formula", "N/A"),
+        "method": data["solution"].get("method", "N/A")
     })
 
-    # -------- Feedback --------
+    st.subheader("🔍 Verifier Agent")
+    st.progress(data["verification"].get("confidence", 0.5))
+
+    st.subheader("📖 Explainer Agent")
+    st.write(data["explanation"])
+
     st.subheader("🧠 Feedback")
     c1, c2 = st.columns(2)
-
     with c1:
-        if st.button("✅ Correct"):
-            st.success("Saved as correct")
-
+        st.button("✅ Correct")
     with c2:
-        if st.button("❌ Incorrect"):
-            st.warning("Saved as incorrect")
+        st.button("❌ Incorrect")
