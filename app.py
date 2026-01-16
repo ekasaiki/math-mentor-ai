@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime
 
 # =============================
-# Agents
+# IMPORT AGENTS
 # =============================
 from agents.parser_agent import parse_problem
 from agents.intent_router import route_intent
@@ -11,158 +11,201 @@ from agents.verifier_agent import verify_solution
 from agents.explainer_agent import explain_solution
 
 # =============================
-# Optional Multimodal Imports
+# RAG
 # =============================
-IMAGE_AVAILABLE = True
-AUDIO_AVAILABLE = True
-
-try:
-    from multimodal.ocr import extract_text_from_image
-except Exception:
-    IMAGE_AVAILABLE = False
-
-try:
-    from multimodal.asr import transcribe_audio
-except Exception:
-    AUDIO_AVAILABLE = False
+from rag.retriever import retrieve_context
 
 # =============================
-# Streamlit Config
+# MULTIMODAL
+# =============================
+from multimodal.ocr import extract_text_from_image
+from multimodal.asr import transcribe_audio
+
+# =============================
+# MEMORY
+# =============================
+from memory.memory_store import save_to_memory, find_similar_by_topic
+
+
+# =============================
+# STREAMLIT CONFIG
 # =============================
 st.set_page_config(page_title="Math Mentor AI", layout="wide")
 st.title("🧠 Math Mentor AI")
-st.caption("Formula-based Multimodal Math Tutor (Text • Image • Audio)")
-st.divider()
+st.write("Reliable Multimodal Math Mentor (RAG + Agents + HITL + Memory)")
+
 
 # =============================
-# Input Mode
+# HITL PANEL
+# =============================
+def hitl_panel(reason):
+    st.warning(f"🧑‍⚖️ HITL Triggered: {reason}")
+    decision = st.radio(
+        "Human Review Required:",
+        ["Approve", "Edit and Re-run", "Reject"],
+        key=f"hitl_{reason}"
+    )
+    return decision
+
+
+# =============================
+# INPUT MODE
 # =============================
 input_mode = st.radio(
     "Choose input type:",
-    ["Text", "Image", "Audio"],
-    horizontal=True
+    ["Text", "Image", "Audio"]
 )
 
+st.divider()
 user_text = ""
+
 
 # =============================
 # TEXT INPUT
 # =============================
 if input_mode == "Text":
-    user_text = st.text_area(
-        "✍️ Enter your math problem",
-        height=120,
-        placeholder="Example: Two coins are tossed. What is the probability of getting exactly one head?"
-    )
+    user_text = st.text_area("✍️ Type your math question", height=150)
+
 
 # =============================
-# IMAGE INPUT (OCR)
+# IMAGE INPUT
 # =============================
 elif input_mode == "Image":
-    if not IMAGE_AVAILABLE:
-        st.error("OCR is not available in this environment.")
-    else:
-        image = st.file_uploader("📷 Upload image", type=["png", "jpg", "jpeg"])
-        if image:
-            extracted_text, confidence = extract_text_from_image(image)
+    image = st.file_uploader("📷 Upload image (JPG / PNG)", type=["jpg", "jpeg", "png"])
 
-            st.subheader("🖼 OCR Output")
-            st.write(f"Confidence: {confidence}")
-            user_text = st.text_area("Extracted text (editable)", extracted_text)
+    if image:
+        extracted_text, confidence = extract_text_from_image(image)
+        st.write(f"OCR Confidence: {confidence}")
+
+        if confidence < 0.75:
+            decision = hitl_panel("Low OCR confidence")
+            if decision == "Edit and Re-run":
+                extracted_text = st.text_area("Edit OCR text:", extracted_text)
+
+        user_text = st.text_area("Extracted text (editable)", extracted_text)
+
 
 # =============================
-# AUDIO INPUT (ASR)
+# AUDIO INPUT
 # =============================
 elif input_mode == "Audio":
-    if not AUDIO_AVAILABLE:
-        st.error("Audio transcription is not available in this environment.")
-    else:
-        audio = st.audio_input("🎤 Record your math question")
-        if audio:
-            transcript, confidence = transcribe_audio(audio)
+    audio_bytes = st.audio_input("🎤 Record your math question")
 
-            st.subheader("🎧 ASR Output")
-            st.write(f"Confidence: {confidence}")
-            user_text = st.text_area("Transcribed text (editable)", transcript)
+    if audio_bytes:
+        transcript, confidence = transcribe_audio(audio_bytes)
+        st.write(f"ASR Confidence: {confidence}")
 
+        if confidence < 0.75:
+            decision = hitl_panel("Low ASR confidence")
+            if decision == "Edit and Re-run":
+                transcript = st.text_area("Edit transcript:", transcript)
+
+        user_text = st.text_area("Transcribed text (editable)", transcript)
+
+
+# =============================
+# SOLVE BUTTON
+# =============================
 st.divider()
-solve_btn = st.button("🚀 Solve Problem")
+solve = st.button("🚀 Solve Problem")
+
 
 # =============================
 # MAIN PIPELINE
 # =============================
-if solve_btn and user_text.strip():
+if solve and user_text.strip():
 
-    # -------------------------
-    # 1️⃣ Parser Agent
-    # -------------------------
+    # -----------------------------
+    # 1️⃣ PARSER AGENT
+    # -----------------------------
     parsed = parse_problem(user_text)
-
     st.subheader("🧠 Parser Agent")
     st.json(parsed)
 
-    if parsed.get("needs_clarification"):
-        st.error("Parser could not clearly identify the problem.")
-        st.stop()
+    if parsed["needs_clarification"]:
+        decision = hitl_panel("Parser detected ambiguity")
+        if decision != "Approve":
+            st.stop()
 
-    # -------------------------
-    # 2️⃣ Intent Router
-    # -------------------------
-    intent = route_intent(parsed)
+    # -----------------------------
+    # 2️⃣ INTENT ROUTER AGENT
+    # -----------------------------
+    route = route_intent(parsed)
+    st.subheader("🧭 Intent Router Agent")
+    st.info(f"Routed to topic: {route}")
 
-    st.subheader("🧭 Intent Router")
-    st.success(f"Detected topic: {intent}")
+    # -----------------------------
+    # 3️⃣ MEMORY LOOKUP
+    # -----------------------------
+    past = find_similar_by_topic(parsed["topic"])
+    if past:
+        st.subheader("🧠 Memory (Similar Problems)")
+        for p in past[:2]:
+            st.info(f"Past Answer: {p['final_answer']}")
 
-    # -------------------------
-    # 3️⃣ Solver Agent (FORMULA-BASED)
-    # -------------------------
-    solution = solve_problem(parsed, docs=[])
+    # -----------------------------
+    # 4️⃣ RAG RETRIEVAL
+    # -----------------------------
+    retrieved_docs = retrieve_context(parsed["problem_text"])
 
+    st.subheader("📚 Retrieved Documents (RAG)")
+    if not retrieved_docs:
+        st.warning("No documents retrieved")
+    else:
+        for d in retrieved_docs:
+            st.markdown(f"*Source:* {d['source']}")
+            st.code(d["content"][:800])
+
+    # -----------------------------
+    # 5️⃣ SOLVER AGENT
+    # -----------------------------
+    solution = solve_problem(parsed, retrieved_docs)
     st.subheader("🧮 Solver Agent")
-    st.json(solution)
-
-    if "answer" not in solution:
-        st.error("Solver could not generate an answer.")
-        st.stop()
-
-    # -------------------------
-    # 4️⃣ Verifier Agent
-    # -------------------------
-    verification = verify_solution(parsed, solution)
-
-    st.subheader("🔍 Verifier Agent")
-    st.json(verification)
-
-    # -------------------------
-    # 5️⃣ Explainer Agent
-    # -------------------------
-    explanation = explain_solution(parsed, solution)
-
-    st.subheader("📖 Explainer Agent")
-    st.text(explanation)
-
-    # -------------------------
-    # FINAL ANSWER (PINNED – NO VANISH)
-    # -------------------------
-    st.divider()
-    st.subheader("✅ Final Answer")
     st.success(solution["answer"])
 
-    # -------------------------
-    # CONFIDENCE
-    # -------------------------
-    st.subheader("📊 Confidence")
-    st.progress(verification.get("confidence", 0.7))
+    # -----------------------------
+    # 6️⃣ VERIFIER AGENT
+    # -----------------------------
+    verification = verify_solution(parsed, solution)
+    st.subheader("✅ Verifier Agent")
+    st.progress(verification["confidence"])
 
-    # -------------------------
-    # FEEDBACK
-    # -------------------------
+    if verification["needs_hitl"]:
+        decision = hitl_panel("Verifier not confident")
+        if decision != "Approve":
+            st.stop()
+
+    # -----------------------------
+    # 7️⃣ EXPLAINER AGENT
+    # -----------------------------
+    explanation = explain_solution(parsed, solution)
+    st.subheader("📖 Explainer Agent")
+    st.write(explanation)
+
+    # -----------------------------
+    # 8️⃣ SAVE TO MEMORY
+    # -----------------------------
+    save_to_memory({
+        "timestamp": str(datetime.now()),
+        "original_input": user_text,
+        "parsed_problem": parsed,
+        "retrieved_context": retrieved_docs,
+        "final_answer": solution["answer"],
+        "confidence": verification["confidence"]
+    })
+
+    # -----------------------------
+    # 9️⃣ FEEDBACK (HITL)
+    # -----------------------------
     st.subheader("🧠 Feedback")
     c1, c2 = st.columns(2)
-    with c1:
-        st.button("✅ Correct")
-    with c2:
-        st.button("❌ Incorrect")
 
-else:
-    st.info("Provide input and click *Solve Problem*.")
+    with c1:
+        if st.button("✅ Correct"):
+            save_to_memory({"final_answer": solution["answer"], "feedback": "correct"})
+            st.success("Feedback saved")
+
+    with c2:
+        if st.button("❌ Incorrect"):
+            save_to_memory({"final_answer": solution["answer"], "feedback": "incorrect"})
+            st.warning("Feedback saved")
